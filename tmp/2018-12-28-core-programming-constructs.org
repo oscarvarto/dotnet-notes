@@ -1,0 +1,25 @@
+* Core Programming Constructs
+
+This is sample content.
+
+#+BEGIN_SRC csharp
+static void LinqQueryOverInts() {
+  int[] numbers = { 10, 20, 0, 40, 1, 2, 3, 8 };
+
+  // LINQ Query!
+  var subset = from i in numbers where i < 10 select i;
+  foreach (int n in subset)
+  {
+  
+  }
+}
+#+END_SRC
+
+** Including some haskell source code
+
+#+BEGIN_SRC haskell
+factorial :: Int -> Int
+factorial 0 = 1
+factorial n = n * factorial (n - 1)
+#+END_SRC
+

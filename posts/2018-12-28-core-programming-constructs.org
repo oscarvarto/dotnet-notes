@@ -1,0 +1,157 @@
+#+LANGUAGE: en
+#+OPTIONS: ':t
+
+* Validation pattern: make illegal states unrepresentable
+
+Fixing bugs costs money. And a lot of developers time and energy. We should always strive to make illegal
+states unrepresentable. This simplifies things down the road, with little additional effort.
+
+The smart constructor pattern, can help us reduce the number of bugs, save time and money, and worrying less
+about problems being discovered until your code is deployed to production because you did enforce some
+invariants in your design up front.
+
+** Using .NET technologies
+
+Let's start with .NET, specifically, with F#. The ~Person~ type could be defined as:
+
+#+BEGIN_SRC fsharp
+type Person =
+  { name: string
+    age:  int }
+#+END_SRC
+
+But previous definition would allow definition of instances that do not model reality:
+
+#+BEGIN_SRC fsharp
+let unrealPerson : Person = { name = ""; age = -34 }
+#+END_SRC
+
+because, in reality, an actual ~Person~ would have a non-empty name (let's say no more than 50
+characters long), and a non-negative age (between 0 and, say for example, 127). With F#
+discriminated unions, we could model the different kinds of ~Error~ s like this:
+
+#+BEGIN_SRC fsharp
+type Error =
+    | NameBetween1And50
+    | AgeBetween0and127
+#+END_SRC
+
+Let's create a ~Person~ module, and create some definitions to enforce our simple business
+rules.
+
+#+BEGIN_SRC fsharp
+open FSharpPlus         // We are relying on the FP abstractions in FSharpPlus!
+open FSharpPlus.Data    // See http://fsprojects.github.io/FSharpPlus/abstractions.html
+
+module Person=
+    type Error =
+        | NameBetween1And50
+        | AgeBetween0and127
+
+    type Name = private { unName : String }
+
+    // Smart constructor
+    let mkName s =
+        let l = length s
+        if (l >= 1 && l <= 50)
+        then Success <| { unName = s }
+        else Failure  [ NameBetween1And50 ]
+#+END_SRC
+
+By making our ~Name~ record ~private~, it is only defined and accessible inside ~Person~
+module (or internal to ~Person~), and the only way to create a instance of a ~Name~, is by
+using our "smart constructor" that enforces our first business rule: "Names should be
+between 1 and 50 characters long".
+
+We could proceed in a similar fashion for our second business rule: "A person's age is
+between 0 and 127".
+
+#+BEGIN_SRC fsharp
+    type Age = private { unAge : byte }
+
+    // Smart constructor
+    let mkAge a =
+        if (a >= 0uy && a <= 127uy)
+        then Success <| { unAge = a }
+        else Failure [ AgeBetween0and127 ]
+#+END_SRC
+
+Finally, we are able to enforce *both* business rules with a new *smart constructor* for
+~Person~:
+
+#+BEGIN_SRC fsharp
+    type Person = private { name : Name
+                            age : Age }
+    with static member create name age = { name = name; age = age }
+
+    // Smart constructors
+    let mkPerson pName pAge =
+        Person.create
+        <!> mkName pName
+        <*> mkAge pAge
+#+END_SRC
+
+For the moment, ignore the symbolic operators ~<!>~ and ~<*>~, but focus on the big picture:
+
+- Our new *smart constructor* will create a valid ~Person~ with data that obeys every smaller
+  *smart constructor* (one for valids ~Name~ s, and other one for valids ~Age~ s).
+- In case any business rule (invariant) is not met, we will get a list of the
+  errors/violations.
+
+The following example will clarify the above:
+
+#+BEGIN_SRC fsharp
+open Person
+
+[<EntryPoint>]
+let main argv =
+    // Compile error FS1093:
+    //     The union cases or fields of the type 'Person'
+    //     are not accessible from this code location
+    // let spiderman = {name = "Peter Parker"; age = 25uy}
+
+    // A valid instance
+    let spidermanOrListOfErrors = mkPerson "Peter Parker" 25uy
+    spidermanOrListOfErrors |> printfn "%A"
+
+    let notValidData = mkPerson "Peter Parker" 200uy
+    notValidData |> printfn "%A"
+
+    Console.ReadLine() |> ignore
+    0 // return an integer exit code
+#+END_SRC
+
+By means of using F# modules, and ~private~ record definitions, it is not possible to make
+direct calls of our *naked constructors*. The only way to create instances for those types
+is to use the smart constructors. See the first compiler error in the example above (for the
+~spiderman~ instance, that does not even compile!).
+
+~spidermanOrListOfErrors~ contains a validated instance of ~Person~, because *both*
+of our ~Name~ and ~Age~ rules are met for this particular example.
+
+~notValidData~, on the other hand, contains an unvalid data, and therefore, we get a
+(~NonEmpty~) list of the business errors.
+
+The actual output for our little example is:
+
+#+BEGIN_SRC text
+Success {name = {unName = "Peter Parker";};
+ age = {unAge = 25uy;};}
+Failure [AgeBetween0and127]
+#+END_SRC
+
+** Using JVM technologies
+
+A more complete discussion of a similar example is covered in
+[[https://intersysconsulting.github.io/scala-essentials-nanodegree/docs/module9.html][*Module 9*]] of
+the [[https://intersysconsulting.github.io/scala-essentials-nanodegree/][Scala Essentials Nanodegree]].
+
+Be aware that we are using some functional programming constructs and that it might be
+necessary to spend some time studying some prerequisites.
+
+For a full treatment of the basics, we recommend the excellent book
+[[https://leanpub.com/fpmortals][Functional Programming for Mortals with Scalaz]] by Sam Halliday.
+Of course, you could always get in touch with our Sales department
+if you are interested in having specialized consultants that could unleash the power of
+mainstream technologies (.NET/JVM) to make illegal states unrepresentable, and save a lot
+of time/money that would otherwise go to fixing bugs that can easily be avoided.
