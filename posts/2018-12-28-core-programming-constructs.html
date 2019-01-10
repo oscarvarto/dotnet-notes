@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>.NET Notes - 2018-12-28-core-programming-constructs</title>
+        <link rel="stylesheet" href="../css/default.css" />
+        <link rel="stylesheet" href="../css/zenburn.css" />
+        <link rel="stylesheet" media="screen" href="https://fontlibrary.org/face/source-code-pro" type="text/css" /> 
+    </head>
+    <body>
+        <header>
+            <div class="logo">
+                <a href="../">.NET Notes</a>
+            </div>
+            <nav>
+                <a href="../">Home</a>
+                <a href="../about.html">About</a>
+                <a href="../contact.html">Contact</a>
+                <a href="../archive.html">Archive</a>
+            </nav>
+        </header>
+
+        <main role="main">
+            <article>
+    <section class="header">
+        Posted on December 28, 2018
+        
+    </section>
+    <section>
+        <h1 id="validation-pattern-make-illegal-states-unrepresentable">Validation pattern: make illegal states unrepresentable</h1>
+<p>Fixing bugs costs money. And a lot of developers time and energy. We should always strive to make illegal states unrepresentable. This simplifies things down the road, with little additional effort.</p>
+<p>The smart constructor pattern, can help us reduce the number of bugs, save time and money, and worrying less about problems being discovered until your code is deployed to production because you did enforce some invariants in your design up front.</p>
+<h2 id="using-.net-technologies">Using .NET technologies</h2>
+<p>Let’s start with .NET, specifically, with F#. The <code>Person</code> type could be defined as:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode fsharp"><code class="sourceCode fsharp"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">type</span> Person =</a>
+<a class="sourceLine" id="cb1-2" title="2">  { name: <span class="dt">string</span></a>
+<a class="sourceLine" id="cb1-3" title="3">    age:  <span class="dt">int</span> }</a></code></pre></div>
+<p>But previous definition would allow definition of instances that do not model reality:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode fsharp"><code class="sourceCode fsharp"><a class="sourceLine" id="cb2-1" title="1"><span class="kw">let</span> unrealPerson : Person = { name = <span class="st">&quot;&quot;</span>; age = <span class="dv">-34</span> }</a></code></pre></div>
+<p>because, in reality, an actual <code>Person</code> would have a non-empty name (let’s say no more than 50 characters long), and a non-negative age (between 0 and, say for example, 127). With F# discriminated unions, we could model the different kinds of <code>Error</code> s like this:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode fsharp"><code class="sourceCode fsharp"><a class="sourceLine" id="cb3-1" title="1"><span class="kw">type</span> Error =</a>
+<a class="sourceLine" id="cb3-2" title="2">    | NameBetween1And50</a>
+<a class="sourceLine" id="cb3-3" title="3">    | AgeBetween0and127</a></code></pre></div>
+<p>Let’s create a <code>Person</code> module, and create some definitions to enforce our simple business rules.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode fsharp"><code class="sourceCode fsharp"><a class="sourceLine" id="cb4-1" title="1"><span class="ot">open</span> FSharpPlus         //<span class="co"> We are relying on the FP abstractions in FSharpPlus!</span></a>
+<a class="sourceLine" id="cb4-2" title="2"><span class="ot">open</span> FSharpPlus<span class="kw">.</span>Data    //<span class="co"> See http://fsprojects.github.io/FSharpPlus/abstractions.html</span></a>
+<a class="sourceLine" id="cb4-3" title="3"></a>
+<a class="sourceLine" id="cb4-4" title="4"><span class="ot">module</span> Person=</a>
+<a class="sourceLine" id="cb4-5" title="5">    <span class="kw">type</span> Error =</a>
+<a class="sourceLine" id="cb4-6" title="6">        | NameBetween1And50</a>
+<a class="sourceLine" id="cb4-7" title="7">        | AgeBetween0and127</a>
+<a class="sourceLine" id="cb4-8" title="8"></a>
+<a class="sourceLine" id="cb4-9" title="9">    <span class="kw">type</span> Name = <span class="kw">private</span> { unName : String }</a>
+<a class="sourceLine" id="cb4-10" title="10"></a>
+<a class="sourceLine" id="cb4-11" title="11">    //<span class="co"> Smart constructor</span></a>
+<a class="sourceLine" id="cb4-12" title="12">    <span class="kw">let</span> mkName s =</a>
+<a class="sourceLine" id="cb4-13" title="13">        <span class="kw">let</span> l = length s</a>
+<a class="sourceLine" id="cb4-14" title="14">        <span class="kw">if</span> (l &gt;= <span class="dv">1</span> &amp;&amp; l &lt;= <span class="dv">50</span>)</a>
+<a class="sourceLine" id="cb4-15" title="15">        <span class="kw">then</span> Success &lt;| { unName = s }</a>
+<a class="sourceLine" id="cb4-16" title="16">        <span class="kw">else</span> Failure  [ NameBetween1And50 ]</a></code></pre></div>
+<p>By making our <code>Name</code> record <code>private</code>, it is only defined and accessible inside <code>Person</code> module (or internal to <code>Person</code>), and the only way to create a instance of a <code>Name</code>, is by using our “smart constructor” that enforces our first business rule: “Names should be between 1 and 50 characters long”.</p>
+<p>We could proceed in a similar fashion for our second business rule: “A person’s age is between 0 and 127”.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode fsharp"><code class="sourceCode fsharp"><a class="sourceLine" id="cb5-1" title="1"><span class="kw">type</span> Age = <span class="kw">private</span> { unAge : <span class="dt">byte</span> }</a>
+<a class="sourceLine" id="cb5-2" title="2"></a>
+<a class="sourceLine" id="cb5-3" title="3">//<span class="co"> Smart constructor</span></a>
+<a class="sourceLine" id="cb5-4" title="4"><span class="kw">let</span> mkAge a =</a>
+<a class="sourceLine" id="cb5-5" title="5">    <span class="kw">if</span> (a &gt;= <span class="dv">0</span>uy &amp;&amp; a &lt;= <span class="dv">127</span>uy)</a>
+<a class="sourceLine" id="cb5-6" title="6">    <span class="kw">then</span> Success &lt;| { unAge = a }</a>
+<a class="sourceLine" id="cb5-7" title="7">    <span class="kw">else</span> Failure [ AgeBetween0and127 ]</a></code></pre></div>
+<p>Finally, we are able to enforce <strong>both</strong> business rules with a new <strong>smart constructor</strong> for <code>Person</code>:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode fsharp"><code class="sourceCode fsharp"><a class="sourceLine" id="cb6-1" title="1"><span class="kw">type</span> Person = <span class="kw">private</span> { name : Name</a>
+<a class="sourceLine" id="cb6-2" title="2">                        age : Age }</a>
+<a class="sourceLine" id="cb6-3" title="3"><span class="kw">with</span> <span class="kw">static</span> <span class="kw">member</span> create name age = { name = name; age = age }</a>
+<a class="sourceLine" id="cb6-4" title="4"></a>
+<a class="sourceLine" id="cb6-5" title="5">//<span class="co"> Smart constructors</span></a>
+<a class="sourceLine" id="cb6-6" title="6"><span class="kw">let</span> mkPerson pName pAge =</a>
+<a class="sourceLine" id="cb6-7" title="7">    Person<span class="kw">.</span>create</a>
+<a class="sourceLine" id="cb6-8" title="8">    &lt;!&gt; mkName pName</a>
+<a class="sourceLine" id="cb6-9" title="9">    &lt;*&gt; mkAge pAge</a></code></pre></div>
+<p>For the moment, ignore the symbolic operators <code>&lt;!&gt;</code> and <code>&lt;*&gt;</code>, but focus on the big picture:</p>
+<ul>
+<li>Our new <strong>smart constructor</strong> will create a valid <code>Person</code> with data that obeys every smaller <strong>smart constructor</strong> (one for valids <code>Name</code> s, and other one for valids <code>Age</code> s).</li>
+<li>In case any business rule (invariant) is not met, we will get a list of the errors/violations.</li>
+</ul>
+<p>The following example will clarify the above:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode fsharp"><code class="sourceCode fsharp"><a class="sourceLine" id="cb7-1" title="1"><span class="ot">open</span> Person</a>
+<a class="sourceLine" id="cb7-2" title="2"></a>
+<a class="sourceLine" id="cb7-3" title="3">[&lt;EntryPoint&gt;]</a>
+<a class="sourceLine" id="cb7-4" title="4"><span class="kw">let</span> main argv =</a>
+<a class="sourceLine" id="cb7-5" title="5">    //<span class="co"> Compile error FS1093:</span></a>
+<a class="sourceLine" id="cb7-6" title="6">    //<span class="co">     The union cases or fields of the type 'Person'</span></a>
+<a class="sourceLine" id="cb7-7" title="7">    //<span class="co">     are not accessible from this code location</span></a>
+<a class="sourceLine" id="cb7-8" title="8">    //<span class="co"> let spiderman = {name = &quot;Peter Parker&quot;; age = 25uy}</span></a>
+<a class="sourceLine" id="cb7-9" title="9"></a>
+<a class="sourceLine" id="cb7-10" title="10">    //<span class="co"> A valid instance</span></a>
+<a class="sourceLine" id="cb7-11" title="11">    <span class="kw">let</span> spidermanOrListOfErrors = mkPerson <span class="st">&quot;Peter Parker&quot;</span> <span class="dv">25</span>uy</a>
+<a class="sourceLine" id="cb7-12" title="12">    spidermanOrListOfErrors |&gt; printfn <span class="st">&quot;%A&quot;</span></a>
+<a class="sourceLine" id="cb7-13" title="13"></a>
+<a class="sourceLine" id="cb7-14" title="14">    <span class="kw">let</span> notValidData = mkPerson <span class="st">&quot;Peter Parker&quot;</span> <span class="dv">200</span>uy</a>
+<a class="sourceLine" id="cb7-15" title="15">    notValidData |&gt; printfn <span class="st">&quot;%A&quot;</span></a>
+<a class="sourceLine" id="cb7-16" title="16"></a>
+<a class="sourceLine" id="cb7-17" title="17">    Console<span class="kw">.</span>ReadLine() |&gt; ignore</a>
+<a class="sourceLine" id="cb7-18" title="18">    <span class="dv">0</span> //<span class="co"> return an integer exit code</span></a></code></pre></div>
+<p>By means of using F# modules, and <code>private</code> record definitions, it is not possible to make direct calls of our <strong>naked constructors</strong>. The only way to create instances for those types is to use the smart constructors. See the first compiler error in the example above (for the <code>spiderman</code> instance, that does not even compile!).</p>
+<p><code>spidermanOrListOfErrors</code> contains a validated instance of <code>Person</code>, because <strong>both</strong> of our <code>Name</code> and <code>Age</code> rules are met for this particular example.</p>
+<p><code>notValidData</code>, on the other hand, contains an unvalid data, and therefore, we get a (<code>NonEmpty</code>) list of the business errors.</p>
+<p>The actual output for our little example is:</p>
+<pre class="text"><code>Success {name = {unName = &quot;Peter Parker&quot;;};
+ age = {unAge = 25uy;};}
+Failure [AgeBetween0and127]
+</code></pre>
+<h2 id="using-jvm-technologies">Using JVM technologies</h2>
+<p>A more complete discussion of a similar example is covered in <a href="https://intersysconsulting.github.io/scala-essentials-nanodegree/docs/module9.html"><strong>Module 9</strong></a> of the <a href="https://intersysconsulting.github.io/scala-essentials-nanodegree/">Scala Essentials Nanodegree</a>.</p>
+<p>Be aware that we are using some functional programming constructs and that it might be necessary to spend some time studying some prerequisites.</p>
+<p>For a full treatment of the basics, we recommend the excellent book <a href="https://leanpub.com/fpmortals">Functional Programming for Mortals with Scalaz</a> by Sam Halliday. Of course, you could always get in touch with our Sales department if you are interested in having specialized consultants that could unleash the power of mainstream technologies (.NET/JVM) to make illegal states unrepresentable, and save a lot of time/money that would otherwise go to fixing bugs that can easily be avoided.</p>
+    </section>
+</article>
+
+        </main>
+
+        <footer>
+            Site proudly generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </footer>
+    </body>
+</html>
