@@ -1,0 +1,106 @@
+* Prism basics
+
+Final code after watching [[http://prismlibrary.github.io/docs/commanding.html][Using Delegate Commands]] video by Brian Lagunas.
+
+#+BEGIN_SRC csharp
+using Prism.Commands;
+using Prism.Mvvm;
+using System;
+using System.Windows.Input;
+
+namespace HelloPrism1.ViewModels
+{
+    public class MainWindowViewModel : BindableBase
+    {
+        private string _title = "Hello Prism";
+        public string Title
+        {
+            get => _title;
+            set => SetProperty(ref _title, value);
+        }
+
+        private bool _isEnabled = false;
+
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set => SetProperty(ref _isEnabled, value);
+        }
+
+        private string _updateText = "";
+        public string UpdateText
+        {
+            get => _updateText;
+            set => SetProperty(ref _updateText, value);
+        }
+
+        public DelegateCommand<int?> MyAwesomeCommand
+        {
+            get;
+            private set;
+        }
+
+        public MainWindowViewModel()
+        {
+            MyAwesomeCommand = 
+                new DelegateCommand<int?>(Execute)
+                    .ObservesCanExecute(() => IsEnabled);
+        }
+
+        private void Execute(int? parameter)
+        {
+            if (parameter.HasValue)
+            {
+                UpdateText = $"Received parameter: {parameter}";
+            }
+        }
+    }
+}
+#+END_SRC
+
+With corresponding XAML here:
+
+#+BEGIN_SRC xml
+<Window
+    x:Class="HelloPrism1.Views.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:prism="http://prismlibrary.com/"
+    prism:ViewModelLocator.AutoWireViewModel="True"
+    xmlns:system="clr-namespace:System;assembly=mscorlib"
+    Title="{Binding Title}"
+    Height="350"
+    Width="525">
+
+    <StackPanel
+        HorizontalAlignment="Center"
+        VerticalAlignment="Center">
+
+        <CheckBox
+            IsChecked="{Binding IsEnabled}"
+            Content="Can Execute Command"
+            Margin="10" />
+
+        <Button
+            Command="{Binding MyAwesomeCommand}"
+            Content="My Awesome Command"
+            Margin="10">
+            <Button.CommandParameter>
+                <system:Int32>1</system:Int32>
+            </Button.CommandParameter>
+        </Button>
+
+        <TextBlock
+            Text="{Binding UpdateText}"
+            Margin="10"
+            FontSize="22" />
+
+    </StackPanel>
+</Window>
+#+END_SRC
+
+*Note*: See this [[https://stackoverflow.com/a/50248175][stackoverflow solution]] that inspired the Command
+Parameter Passing in the XAML above.
+
+Source code
+
