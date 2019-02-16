@@ -1,0 +1,3 @@
+* Personal .NET (C# and F#) notes
+
+Source code for [[https://github.com/oscarvarto/dotnet-notes][.NET Notes]].

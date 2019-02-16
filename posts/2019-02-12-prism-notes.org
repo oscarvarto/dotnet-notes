@@ -102,5 +102,5 @@ With corresponding XAML here:
 *Note*: See this [[https://stackoverflow.com/a/50248175][stackoverflow solution]] that inspired the Command
 Parameter Passing in the XAML above.
 
-Source code
+*Source code*: [[https://github.com/oscarvarto/HelloPrism1][Prism Knowledge Transfer]].
 
